@@ -38,7 +38,7 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
           password: config.get<string>('DB_PASSWORD'),
           database: config.get<string>('DB_NAME'),
           autoLoadEntities: true,
-          synchronize: config.get<string>('NODE_ENV') !== 'production',
+          synchronize: true, // Forzamos true para asegurar que se creen las tablas en GCP
           retryAttempts: 5,
           retryDelay: 5000,
         };
