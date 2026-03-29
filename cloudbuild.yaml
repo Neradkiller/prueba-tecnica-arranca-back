@@ -1,5 +1,5 @@
 steps:
-  # 1. Construir la imagen (Incluye Tests)
+  # 1. Construir la imagen (Incluye Tests Unitarios)
   - name: 'gcr.io/cloud-builders/docker'
     id: 'Build-and-Test'
     args: [
@@ -36,11 +36,11 @@ steps:
       - '--add-cloudsql-instances'
       - 'sunny-studio-481512-a5:us-central1:notas-db-instance'
       - '--set-env-vars'
-      - 'NODE_ENV=production,REDIS_HOST=10.118.147.211,REDIS_PORT=6379,DB_HOST=/cloudsql/sunny-studio-481512-a5:us-central1:notas-db-instance,FRONTEND_URL=https://prueba-tecnca-arranca-front.vercel.app'
+      - 'NODE_ENV=production,REDIS_HOST=10.118.147.211,REDIS_PORT=6379,DB_HOST=/cloudsql/sunny-studio-481512-a5:us-central1:notas-db-instance,DB_PORT=5432,FRONTEND_URL=https://prueba-tecnca-arranca-front.vercel.app'
       - '--set-secrets'
       - 'JWT_SECRET=JWT_SECRET:latest,DB_PASSWORD=DB_PASSWORD:latest,DB_USER=DB_USER:latest,DB_NAME=DB_NAME:latest'
       - '--timeout'
-      - '300' # Darle más tiempo al arranque inicial (5 minutos)
+      - '600' # Aumentado a 10 minutos para máxima tolerancia
 
 images:
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/backend-repo/notas-backend:$COMMIT_SHA'

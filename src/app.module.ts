@@ -29,16 +29,17 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
         
         return {
           type: 'postgres',
-          // Si estamos en GCP, usamos socketPath. Si no, host/port normal.
-          host: isCloudRun ? undefined : dbHost,
+          // En Cloud Run, el host es la ruta del socket y no se usa puerto
+          host: dbHost,
           port: isCloudRun ? undefined : config.get<number>('DB_PORT'),
-          extra: isCloudRun ? { host: dbHost } : undefined,
-          
           username: config.get<string>('DB_USER'),
           password: config.get<string>('DB_PASSWORD'),
           database: config.get<string>('DB_NAME'),
           autoLoadEntities: true,
           synchronize: config.get<string>('NODE_ENV') !== 'production',
+          // Optimización de reconexión
+          retryAttempts: 3,
+          retryDelay: 3000,
         };
       },
     }),
@@ -50,7 +51,7 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
           socket: {
             host: config.get<string>('REDIS_HOST'),
             port: config.get<number>('REDIS_PORT'),
-            connectTimeout: 10000, // Darle margen al VPC Connector
+            connectTimeout: 15000,
           },
           ttl: 600,
         }),
