@@ -1,21 +1,34 @@
 steps:
-  # 1. Construir la imagen
+  # 1. Construir la imagen de Docker (Etapa de compilación y entorno)
   - name: 'gcr.io/cloud-builders/docker'
+    id: 'Build'
     args: [
       'build', 
       '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/backend-repo/notas-backend:$COMMIT_SHA', 
       '.'
     ]
 
-  # 2. Subir la imagen
+  # 2. Ejecutar Pruebas Unitarias dentro del contenedor recién construido
+  # Si este paso falla (exit code != 0), todo el build se cancela y no hay despliegue.
   - name: 'gcr.io/cloud-builders/docker'
+    id: 'Test'
+    args: [
+      'run',
+      'us-central1-docker.pkg.dev/$PROJECT_ID/backend-repo/notas-backend:$COMMIT_SHA',
+      'npm', 'test'
+    ]
+
+  # 3. Subir la imagen al Artifact Registry (Solo si los tests pasaron)
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'Push'
     args: [
       'push', 
       'us-central1-docker.pkg.dev/$PROJECT_ID/backend-repo/notas-backend:$COMMIT_SHA'
     ]
 
-  # 3. Desplegar en Cloud Run vinculando Secretos y Red
+  # 4. Desplegar en Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Deploy'
     entrypoint: gcloud
     args:
       - 'run'
