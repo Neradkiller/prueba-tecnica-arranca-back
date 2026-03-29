@@ -1,0 +1,44 @@
+steps:
+  # 1. Construir la imagen
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build', 
+      '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/backend-repo/notas-backend:$COMMIT_SHA', 
+      '.'
+    ]
+
+  # 2. Subir la imagen
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'push', 
+      'us-central1-docker.pkg.dev/$PROJECT_ID/backend-repo/notas-backend:$COMMIT_SHA'
+    ]
+
+  # 3. Desplegar en Cloud Run vinculando Secretos y Red
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'notas-arranca-backend'
+      - '--image'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/backend-repo/notas-backend:$COMMIT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--vpc-connector'
+      - 'notas-vpc-connector'
+      - '--add-cloudsql-instances'
+      - 'sunny-studio-481512-a5:us-central1:notas-db-instance'
+      - '--set-env-vars'
+      - 'NODE_ENV=production,REDIS_HOST=10.118.147.211,REDIS_PORT=6379,DB_HOST=/cloudsql/sunny-studio-481512-a5:us-central1:notas-db-instance,FRONTEND_URL=https://prueba-tecnca-arranca-front.vercel.app'
+      - '--set-secrets'
+      - 'JWT_SECRET=JWT_SECRET:latest,DB_PASSWORD=DB_PASSWORD:latest,DB_USER=DB_USER:latest,DB_NAME=DB_NAME:latest'
+
+images:
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/backend-repo/notas-backend:$COMMIT_SHA'
+
+options:
+  logging: CLOUD_LOGGING
