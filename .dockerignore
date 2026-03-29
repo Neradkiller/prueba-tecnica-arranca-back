@@ -1,14 +1,24 @@
+# Dependencias y Compilación
 node_modules
 dist
-npm-debug.log
-Dockerfile
-.dockerignore
+tsconfig.build.tsbuildinfo
+
+# Logs y Temporales
+logs
+*.log
+npm-debug.log*
+.DS_Store
+
+# Git
 .git
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+cloudbuild.yaml
+
+# Secretos (IMPORTANTE: Nunca incluirlos en la imagen)
 .env
-test
-README.md
-nest-cli.json
-tsconfig.build.json
-tsconfig.json
-eslint.config.mjs
-.prettierrc
+.env.*
+cookies.txt
