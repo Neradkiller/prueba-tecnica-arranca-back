@@ -7,7 +7,6 @@ import * as winston from 'winston';
 import 'winston-daily-rotate-file';
 
 import { AppModule } from './app.module';
-import { CsrfGuard } from './common/guards/csrf.guard';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -23,19 +22,17 @@ async function bootstrap() {
             }),
           ),
         }),
-        // Rotación diaria para errores
         new winston.transports.DailyRotateFile({
           filename: 'logs/error-%DATE%.log',
           datePattern: 'YYYY-MM-DD',
           level: 'error',
-          maxFiles: '14d', // Mantener 14 días
+          maxFiles: '14d',
           format: winston.format.combine(winston.format.timestamp(), winston.format.json()),
         }),
-        // Rotación diaria para todos los logs (audit trail)
         new winston.transports.DailyRotateFile({
           filename: 'logs/combined-%DATE%.log',
           datePattern: 'YYYY-MM-DD',
-          maxFiles: '30d', // Mantener 30 días
+          maxFiles: '30d',
           format: winston.format.combine(winston.format.timestamp(), winston.format.json()),
         }),
       ],
@@ -53,9 +50,26 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  // CORS Configurado para soportar Cookies (HttpOnly) y dominios de Vercel
+  const allowedOrigins = [
+    process.env.FRONTEND_URL,
+    'https://prueba-tecnca-arranca-front.vercel.app',
+    'https://prueba-tecnca-arranca-front-cqark9q18-neradkillers-projects.vercel.app',
+    // Permitir subdominios de preview de Vercel usando Regex (opcional pero potente)
+    /https:\/\/prueba-tecnca-arranca-front-.*\.vercel\.app/
+  ];
+
   app.enableCors({
-    origin: frontendUrl,
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      if (!origin || allowedOrigins.some(pattern => {
+        if (!pattern) return false;
+        return typeof pattern === 'string' ? pattern === origin : pattern.test(origin);
+      })) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     allowedHeaders: 'Content-Type, Accept, Authorization, X-Requested-With',
@@ -71,9 +85,7 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle('Notas Arranca Backend')
-    .setDescription(`
-      API de alto rendimiento con persistencia de logs física y rotativa.
-    `)
+    .setDescription('API de alto rendimiento con persistencia de logs física y rotativa.')
     .setVersion('1.0')
     .addCookieAuth('Authentication', {
       type: 'apiKey',
