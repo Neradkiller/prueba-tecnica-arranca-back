@@ -29,9 +29,10 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
         
         return {
           type: 'postgres',
-          host: isSocket ? undefined : dbHost,
+          // Para Postgres via Unix Socket, la ruta debe ir en 'host'
+          host: dbHost, 
+          // Si es socket, no se debe proveer puerto (el driver lo ignora pero Nest puede confundirse)
           port: isSocket ? undefined : config.get<number>('DB_PORT'),
-          extra: isSocket ? { socketPath: dbHost } : undefined,
           
           username: config.get<string>('DB_USER'),
           password: config.get<string>('DB_PASSWORD'),
@@ -40,7 +41,6 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
           synchronize: config.get<string>('NODE_ENV') !== 'production',
           retryAttempts: 5,
           retryDelay: 5000,
-          keepConnectionAlive: true,
         };
       },
     }),
