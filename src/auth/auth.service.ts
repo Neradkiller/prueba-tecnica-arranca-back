@@ -30,9 +30,14 @@ export class AuthService {
     const payload = { sub: user.id, email: user.email };
     const token = this.jwtService.sign(payload);
     
-    // For local development on HTTP, we cannot use Secure, and Lax is fine because they share localhost (albeit different ports)
-    // In production, this should be SameSite=None; Secure if API is on a different domain
-    const cookie = `Authentication=${token}; HttpOnly; Path=/; Max-Age=3600; SameSite=Lax`;
+    // Para desarrollo local (HTTP) se requiere SameSite=Lax.
+    // Para producción cross-domain (HTTPS Vercel -> HTTPS Cloud Run),
+    // el navegador bloquea la cookie SI NO tiene SameSite=None y Secure.
+    const isProd = process.env.NODE_ENV === 'production' || !!process.env.K_SERVICE;
+    const sameSite = isProd ? 'None' : 'Lax';
+    const secure = isProd ? '; Secure' : '';
+    
+    const cookie = `Authentication=${token}; HttpOnly; Path=/; Max-Age=3600; SameSite=${sameSite}${secure}`;
     
     return { cookie };
   }
