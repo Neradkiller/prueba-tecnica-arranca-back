@@ -3,11 +3,9 @@ FROM node:23.3.0-alpine AS builder
 
 WORKDIR /app
 
-# Instalar dependencias necesarias para compilar (si hubiera nativas)
-# RUN apk add --no-cache python3 make g++
-
 COPY package*.json ./
-RUN npm ci
+# Usamos legacy-peer-deps para resolver conflictos de class-validator en NestJS 11
+RUN npm ci --legacy-peer-deps
 
 COPY . .
 RUN npm run build
@@ -19,15 +17,13 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Instalar solo dependencias de producción (omitir devDependencies)
 COPY package*.json ./
-RUN npm ci --only=production
+# También aplicamos el flag para las dependencias de producción
+RUN npm ci --only=production --legacy-peer-deps
 
-# Copiar el código compilado desde la etapa de builder
 COPY --from=builder /app/dist ./dist
 
-# Puerto por defecto (se puede sobreescribir con PORT=XXXX)
+# GCP Cloud Run inyectará el puerto dinámicamente
 EXPOSE 3000
 
-# Ejecutar la aplicación en producción
 CMD ["node", "dist/main"]
