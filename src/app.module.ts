@@ -31,7 +31,6 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
           type: 'postgres',
           host: isSocket ? undefined : dbHost,
           port: isSocket ? undefined : config.get<number>('DB_PORT'),
-          // socketPath es la forma estándar para Cloud SQL en el driver 'pg'
           extra: isSocket ? { socketPath: dbHost } : undefined,
           
           username: config.get<string>('DB_USER'),
@@ -56,13 +55,12 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
               port: config.get<number>('REDIS_PORT'),
               connectTimeout: 10000,
             },
-            ttl: 600,
+            ttl: 600000,
           });
           return { store };
         } catch (error) {
-          // Si Redis falla, el sistema sigue funcionando (sin caché) en lugar de morir
           console.error('Redis Connection Failed, falling back to memory', error);
-          return { ttl: 600 }; 
+          return { ttl: 600000 }; 
         }
       },
     }),
