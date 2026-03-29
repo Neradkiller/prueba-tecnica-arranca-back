@@ -25,46 +25,51 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const dbHost = config.get<string>('DB_HOST');
-        const isCloudRun = dbHost && dbHost.startsWith('/cloudsql');
+        const isSocket = dbHost && dbHost.startsWith('/');
         
         return {
           type: 'postgres',
-          // En Cloud Run, el host es la ruta del socket y no se usa puerto
-          host: dbHost,
-          port: isCloudRun ? undefined : config.get<number>('DB_PORT'),
+          host: isSocket ? undefined : dbHost,
+          port: isSocket ? undefined : config.get<number>('DB_PORT'),
+          // socketPath es la forma estándar para Cloud SQL en el driver 'pg'
+          extra: isSocket ? { socketPath: dbHost } : undefined,
+          
           username: config.get<string>('DB_USER'),
           password: config.get<string>('DB_PASSWORD'),
           database: config.get<string>('DB_NAME'),
           autoLoadEntities: true,
           synchronize: config.get<string>('NODE_ENV') !== 'production',
-          // Optimización de reconexión
-          retryAttempts: 3,
-          retryDelay: 3000,
+          retryAttempts: 5,
+          retryDelay: 5000,
+          keepConnectionAlive: true,
         };
       },
     }),
     CacheModule.registerAsync({
       isGlobal: true,
       inject: [ConfigService],
-      useFactory: async (config: ConfigService) => ({
-        store: await redisStore({
-          socket: {
-            host: config.get<string>('REDIS_HOST'),
-            port: config.get<number>('REDIS_PORT'),
-            connectTimeout: 15000,
-          },
-          ttl: 600,
-        }),
-      }),
+      useFactory: async (config: ConfigService) => {
+        try {
+          const store = await redisStore({
+            socket: {
+              host: config.get<string>('REDIS_HOST'),
+              port: config.get<number>('REDIS_PORT'),
+              connectTimeout: 10000,
+            },
+            ttl: 600,
+          });
+          return { store };
+        } catch (error) {
+          // Si Redis falla, el sistema sigue funcionando (sin caché) en lugar de morir
+          console.error('Redis Connection Failed, falling back to memory', error);
+          return { ttl: 600 }; 
+        }
+      },
     }),
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        throttlers: [
-          { name: 'short', ttl: 1000, limit: 1000 },
-          { name: 'medium', ttl: 60000, limit: 5000 },
-          { name: 'auth', ttl: 300000, limit: 500 },
-        ],
+        throttlers: [{ name: 'default', ttl: 60000, limit: 5000 }],
         storage: new ThrottlerStorageRedisService({
           host: config.get<string>('REDIS_HOST'),
           port: config.get<number>('REDIS_PORT'),

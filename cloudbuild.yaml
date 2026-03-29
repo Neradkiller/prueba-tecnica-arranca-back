@@ -1,5 +1,5 @@
 steps:
-  # 1. Construir la imagen (Incluye Tests Unitarios)
+  # 1. Construir la imagen (Incluye Tests)
   - name: 'gcr.io/cloud-builders/docker'
     id: 'Build-and-Test'
     args: [
@@ -40,7 +40,11 @@ steps:
       - '--set-secrets'
       - 'JWT_SECRET=JWT_SECRET:latest,DB_PASSWORD=DB_PASSWORD:latest,DB_USER=DB_USER:latest,DB_NAME=DB_NAME:latest'
       - '--timeout'
-      - '600' # Aumentado a 10 minutos para máxima tolerancia
+      - '600'
+      - '--cpu'
+      - '1' # Asegurar potencia suficiente para el arranque
+      - '--memory'
+      - '512Mi'
 
 images:
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/backend-repo/notas-backend:$COMMIT_SHA'
