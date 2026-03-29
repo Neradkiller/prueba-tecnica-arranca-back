@@ -39,6 +39,3 @@ steps:
 
 images:
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/backend-repo/notas-backend:$COMMIT_SHA'
-
-options:
-  logging: CLOUD_LOGGING
