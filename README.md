@@ -2,35 +2,52 @@
 
 API de alto rendimiento construida con NestJS para la gestión de tareas y notas, diseñada con un enfoque en seguridad, escalabilidad y experiencia de usuario.
 
+---
+
+## 🏗️ Descripción de la Arquitectura
+
+El proyecto sigue una arquitectura **Modular y Orientada a Servicios** (basada en el estándar de NestJS), organizada en capas para garantizar el desacoplamiento y la mantenibilidad:
+
+1.  **Capa de Controladores (Controllers)**: Gestiona las rutas, la entrada de datos mediante DTOs y define los códigos de respuesta HTTP.
+2.  **Capa de Servicios (Services)**: Contiene la lógica de negocio pura, interactuando con los repositorios y la capa de caché.
+3.  **Capa de Persistencia (Entities/Repositories)**: Utiliza TypeORM para mapear objetos TypeScript a tablas en PostgreSQL.
+4.  **Capa de Seguridad (Guards)**: Implementa la defensa en profundidad mediante `JwtAuthGuard` (autenticación), `CsrfGuard` (integridad) y `ThrottlerGuard` (rate limiting).
+5.  **Capa Transversal (Cross-cutting)**:
+    *   **Logging**: `LoggingInterceptor` utiliza Winston para el seguimiento detallado de cada petición.
+    *   **Manejo de Errores**: `AllExceptionsFilter` garantiza que todos los errores sigan un formato JSON uniforme.
+    *   **Caché**: Sistema distribuido en Redis con lógica de invalidación por patrón de usuario.
+
+---
+
+## 💡 Decisiones Técnicas Tomadas
+
+*   **JWT en Cookies HttpOnly**: Se decidió no enviar el token en el cuerpo del JSON ni guardarlo en `localStorage` del frontend. Al usar cookies `HttpOnly`, el token es inaccesible para scripts maliciosos, mitigando ataques **XSS**.
+*   **Defensa CSRF personalizada**: Para evitar el uso de librerías pesadas de sincronización de tokens, se implementó un Guard que exige el header `X-Requested-With: XMLHttpRequest`. Esto asegura que la petición provenga de un cliente web legítimo y no de un formulario oculto en otro sitio.
+*   **Gestión de Tags Independiente**: Las etiquetas se diseñaron como una entidad propia (`ManyToMany` con Tareas). Esto permite al usuario reutilizar etiquetas, filtrar por ellas en el futuro y mantener la consistencia de los datos.
+*   **Invalidación Granular de Caché**: En lugar de borrar todo el caché global, el sistema detecta qué usuario realizó el cambio y purga únicamente sus páginas de tareas en Redis (`tasks:list:userId:*`), optimizando el rendimiento global del servidor.
+*   **Despliegue Serverless en GCP**: Se eligió **Cloud Run** para el backend y **Cloud SQL** para la base de datos por su capacidad de escalado automático y facilidad de integración con **Secret Manager**, manteniendo las credenciales fuera del repositorio.
+
+---
+
 ## 🚀 Tecnologías
 - **Framework**: [NestJS](https://nestjs.com/) (Node.js 23+)
 - **Base de Datos**: PostgreSQL 16 (TypeORM)
 - **Caché & Throttling**: Redis 7
 - **Seguridad**: JWT (Cookies HttpOnly), CSRF Protection, Bcrypt.
+- **Logging**: Winston & Winston Daily Rotate File.
 - **Documentación**: Swagger (OpenAPI 3.0)
 - **Contenedores**: Docker & Docker Compose
 
 ---
 
-## 🔒 Seguridad Implementada
-- **Autenticación Basada en Cookies**: El JWT se almacena en una cookie `HttpOnly`, `Secure` y `SameSite=Lax`. Esto mitiga ataques XSS al no exponer el token al JavaScript del cliente.
-- **Protección CSRF**: Todas las peticiones de mutación (`POST`, `PUT`, `PATCH`, `DELETE`) requieren la cabecera `X-Requested-With: XMLHttpRequest`.
-- **Rate Limiting (Throttling)**:
-  - Global: 100 req/min.
-  - Login: 5 req/5 min (Anti fuerza bruta).
-  - Registro: 1 req/min (Anti spam).
-- **Aislamiento Multitenant**: Cada usuario solo tiene acceso a sus propias tareas y etiquetas mediante filtrado obligatorio por `userId` inyectado desde el JWT.
-
----
-
-## 🛠️ Configuración y Ejecución
+## 🛠️ Instrucciones de Instalación y Ejecución
 
 ### 1. Variables de Entorno
 Crea un archivo `.env` en la raíz del proyecto basándote en lo siguiente:
 ```env
 # Servidor
 PORT=3000
-FRONTEND_URL=http://localhost:5173
+FRONTEND_URL=https://prueba-tecnca-arranca-front.vercel.app
 
 # Base de Datos (Postgres)
 DB_HOST=localhost
@@ -56,8 +73,8 @@ docker-compose up --build -d
 ### 3. Ejecución Local (Desarrollo)
 Si prefieres correrlo sin Docker para la App:
 ```bash
-# 1. Instalar dependencias
-npm install
+# 1. Instalar dependencias (Usar --legacy-peer-deps por conflictos de NestJS 11)
+npm install --legacy-peer-deps
 
 # 2. Generar build
 npm run build
@@ -68,59 +85,51 @@ npm run start:dev
 
 ---
 
-## 📚 Documentación de la API (Endpoints)
+## 📚 Documentación de la API
 
-La documentación interactiva está disponible en: **`http://localhost:3000/api/docs`**
+La documentación interactiva y detallada (Swagger) está disponible en: **`http://localhost:3000/api/docs`**
 
-### Módulo de Autenticación (`/api/v1/auth`)
-| Método | Ruta | Descripción | Seguridad |
+### Resumen de Endpoints (`/api/v1`)
+
+#### Módulo de Autenticación (`/auth`)
+| Método | Ruta | Descripción | HTTP Code |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/login` | Login y seteo de cookie `Authentication`. | Rate Limit: 5/5min |
-| `POST` | `/logout` | Limpia la cookie de sesión. | JWT Cookie |
-| `GET` | `/me` | Retorna el perfil del usuario autenticado. | JWT Cookie |
+| `POST` | `/login` | Inicia sesión y setea cookie. | 200 OK |
+| `POST` | `/logout` | Limpia la cookie de sesión. | 200 OK |
+| `GET` | `/me` | Perfil del usuario autenticado. | 200 OK |
 
-### Módulo de Usuarios (`/api/v1/users`)
-| Método | Ruta | Descripción | Seguridad |
+#### Módulo de Usuarios (`/users`)
+| Método | Ruta | Descripción | HTTP Code |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/register` | Registra un nuevo usuario en el sistema. | Rate Limit: 1/min |
+| `POST` | `/register` | Registra un nuevo usuario. | 201 Created |
 
-### Módulo de Tareas (`/api/v1/tasks`)
+#### Módulo de Tareas (`/tasks`)
 *Requieren Cookie `Authentication` y Header `X-Requested-With`.*
-| Método | Ruta | Descripción | Observaciones |
+| Método | Ruta | Parámetros Query | Observaciones |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/` | Lista tareas paginadas. | Caché Activo |
-| `POST` | `/` | Crea una nueva tarea con tags. | Invalida Caché |
-| `GET` | `/:id` | Detalle de una tarea específica. | Filtrado por Dueño |
-| `PATCH` | `/:id` | Actualiza título, estado, prioridad o tags. | Invalida Caché |
-| `DELETE` | `/:id` | Elimina la tarea permanentemente. | Invalida Caché |
-
-### Módulo de Etiquetas (`/api/v1/tags`)
-| Método | Ruta | Descripción |
-| :--- | :--- | :--- |
-| `GET` | `/` | Obtiene todas las etiquetas del usuario. |
-| `POST` | `/` | Crea una etiqueta personalizada (Nombre/Color). |
-| `PATCH` | `/:id` | Actualiza nombre o color de la etiqueta. |
-| `DELETE` | `/:id` | Elimina el tag (se desvincula de tareas). |
+| `GET` | `/` | `page`, `limit` | Caché Activo |
+| `POST` | `/` | (Cuerpo JSON) | Invalida Caché |
+| `PATCH` | `/:id` | (Cuerpo JSON) | Actualización parcial |
+| `DELETE` | `/:id` | - | Eliminación total |
 
 ---
 
 ## 🧪 Pruebas (Testing)
 
-### Pruebas Unitarias
-Validan la lógica de negocio, servicios e invalidación de caché (usando mocks).
-```bash
-npm test
-```
+El sistema cuenta con una cobertura integral de pruebas unitarias y de integración:
 
-### Pruebas E2E
-Validan el flujo completo y los Guards de Seguridad (CSRF, Auth).
-```bash
-npm run test:e2e
-```
+*   **Pruebas Unitarias**: Validan lógica de negocio, servicios e invalidación de caché.
+    ```bash
+    npm test
+    ```
+*   **Pruebas E2E**: Validan el flujo completo y la efectividad de los Guards de Seguridad.
+    ```bash
+    npm run test:e2e
+    ```
 
 ---
 
-## 🏗️ Arquitectura de Caché
-El sistema utiliza **Redis** para mejorar el tiempo de respuesta:
-1. Al consultar tareas (`GET /tasks`), el resultado se guarda en Redis bajo una llave única por usuario y página.
-2. Al realizar cualquier cambio (`CREATE`, `UPDATE`, `DELETE`), el sistema realiza una **purgue automática** de todas las páginas de caché del usuario para garantizar consistencia absoluta.
+## 🔒 Seguridad Implementada
+*   **Aislamiento Multitenant**: El filtrado por `userId` es obligatorio en todas las consultas a DB y Caché.
+*   **Rate Limiting**: Límites configurados dinámicamente en Redis para evitar abusos por IP.
+*   **Logs de Auditoría**: Almacenados en la carpeta `/logs` con rotación diaria para análisis post-mortem.
