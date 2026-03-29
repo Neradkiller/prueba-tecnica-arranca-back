@@ -1,13 +1,17 @@
-# Stage 1: Build
+# Stage 1: Build & Test
 FROM node:23.3.0-alpine AS builder
 
 WORKDIR /app
 
 COPY package*.json ./
-# Usamos legacy-peer-deps para resolver conflictos de class-validator en NestJS 11
 RUN npm ci --legacy-peer-deps
 
 COPY . .
+
+# Paso Crítico: Ejecutar pruebas unitarias. 
+# Si fallan, el build de Docker se detiene aquí.
+RUN npm test
+
 RUN npm run build
 
 # Stage 2: Production
@@ -18,7 +22,6 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY package*.json ./
-# También aplicamos el flag para las dependencias de producción
 RUN npm ci --only=production --legacy-peer-deps
 
 COPY --from=builder /app/dist ./dist
