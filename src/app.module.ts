@@ -23,16 +23,24 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        host: config.get<string>('DB_HOST'),
-        port: config.get<number>('DB_PORT'),
-        username: config.get<string>('DB_USER'),
-        password: config.get<string>('DB_PASSWORD'),
-        database: config.get<string>('DB_NAME'),
-        autoLoadEntities: true,
-        synchronize: true,
-      }),
+      useFactory: (config: ConfigService) => {
+        const dbHost = config.get<string>('DB_HOST');
+        const isCloudRun = dbHost && dbHost.startsWith('/cloudsql');
+        
+        return {
+          type: 'postgres',
+          // Si estamos en GCP, usamos socketPath. Si no, host/port normal.
+          host: isCloudRun ? undefined : dbHost,
+          port: isCloudRun ? undefined : config.get<number>('DB_PORT'),
+          extra: isCloudRun ? { host: dbHost } : undefined,
+          
+          username: config.get<string>('DB_USER'),
+          password: config.get<string>('DB_PASSWORD'),
+          database: config.get<string>('DB_NAME'),
+          autoLoadEntities: true,
+          synchronize: config.get<string>('NODE_ENV') !== 'production',
+        };
+      },
     }),
     CacheModule.registerAsync({
       isGlobal: true,
@@ -42,6 +50,7 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
           socket: {
             host: config.get<string>('REDIS_HOST'),
             port: config.get<number>('REDIS_PORT'),
+            connectTimeout: 10000, // Darle margen al VPC Connector
           },
           ttl: 600,
         }),
@@ -66,22 +75,10 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
     TasksModule,
   ],
   providers: [
-    {
-      provide: APP_GUARD,
-      useClass: CsrfGuard,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard,
-    },
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: LoggingInterceptor,
-    },
-    {
-      provide: APP_FILTER,
-      useClass: AllExceptionsFilter,
-    },
+    { provide: APP_GUARD, useClass: CsrfGuard },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
+    { provide: APP_FILTER, useClass: AllExceptionsFilter },
   ],
 })
 export class AppModule {}
